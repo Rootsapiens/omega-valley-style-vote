@@ -33,6 +33,106 @@ function choicePanel(title, help, options, correct) {
   });
 }
 
+// ---------- mind puzzles (one per level); each resolves true when solved ----------
+function sheet(p, close, title, help) {
+  const s = document.createElement("div"); s.className = "sheet";
+  const h = document.createElement("h3"); h.textContent = title; s.appendChild(h);
+  const t = document.createElement("p"); t.textContent = help; s.appendChild(t);
+  const x = document.createElement("button"); x.className = "btn"; x.textContent = "Close"; x.onclick = () => close(false);
+  p.appendChild(s);
+  return { s, done: () => s.appendChild(x) };
+}
+function grid(n, size) { const g = document.createElement("div"); g.style.cssText = `display:grid;grid-template-columns:repeat(${n},1fr);gap:8px;width:min(100%,${size}px);margin:0 auto`; return g; }
+function cell(txt) { const b = document.createElement("button"); b.className = "choice"; b.style.cssText = "aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:clamp(16px,3vw,34px);padding:0"; b.textContent = txt; return b; }
+
+// L1: the herd's order. Watch which cows pass, then repeat the order.
+E.puzzleHerd = () => E.panel((p, close) => {
+  const { s, done } = sheet(p, close, "The order of the herd", "Watch the cows pass the gap, then tap them in the same order.");
+  const cows = [["Brown", "#7a4a24"], ["Black", "#222"], ["White", "#ddd"], ["Spotted", "#a8835a"]];
+  const seq = [0, 2, 1, 3, 2, 0];
+  const g = grid(4, 520); s.appendChild(g);
+  const bs = cows.map(([n, c], i) => { const b = cell(n); b.style.borderBottom = `10px solid ${c}`; b.disabled = true; g.appendChild(b); return b; });
+  const msg = document.createElement("p"); s.appendChild(msg); done();
+  let at = 0;
+  const show = async () => {
+    bs.forEach(b => b.disabled = true); msg.textContent = "Watch…";
+    for (const i of seq) { bs[i].classList.add("ok"); await E.wait(600); bs[i].classList.remove("ok"); await E.wait(200); }
+    msg.textContent = "Your turn."; at = 0; bs.forEach(b => b.disabled = false);
+  };
+  bs.forEach((b, i) => b.onclick = () => {
+    if (seq[at] !== i) { msg.textContent = "Wrong cow. Watch again."; show(); return; }
+    if (++at === seq.length) close(true);
+  });
+  setTimeout(show, 500);
+});
+
+// L2: the latched gate. Lights Out: tapping a stud flips it and its neighbours; make all studs dark.
+E.puzzleLatch = () => E.panel((p, close) => {
+  const { s, done } = sheet(p, close, "The gate latch", "Tapping a stud flips it and the studs beside it. Make every stud dark.");
+  const on = [1, 0, 1, 0, 0, 0, 1, 0, 1];   // solvable: tap the four corners
+  const g = grid(3, 300); s.appendChild(g);
+  const bs = on.map(() => cell(""));
+  const paint = () => bs.forEach((b, i) => { b.style.background = on[i] ? "#e9a24c" : "#241b16"; b.setAttribute("aria-label", "stud " + (i + 1) + (on[i] ? " lit" : " dark")); });
+  bs.forEach((b, i) => { g.appendChild(b); b.onclick = () => {
+    const r = Math.floor(i / 3), c = i % 3;
+    for (const [dr, dc] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const rr = r + dr, cc = c + dc; if (rr >= 0 && rr < 3 && cc >= 0 && cc < 3) on[rr * 3 + cc] ^= 1; }
+    paint(); if (on.every(v => !v)) setTimeout(() => close(true), 300);
+  }; });
+  paint(); done();
+});
+
+// L3: the drawer. Slide the tiles into order 1-8.
+E.puzzleSlide = () => E.panel((p, close) => {
+  const { s, done } = sheet(p, close, "The stuck drawer", "Slide the tiles into order, 1 to 8, with the gap last.");
+  let t = [1, 2, 3, 4, 0, 6, 7, 5, 8];   // a few moves from solved
+  const g = grid(3, 300); s.appendChild(g);
+  const draw = () => { g.replaceChildren(...t.map((v, i) => { const b = cell(v ? String(v) : ""); if (!v) b.style.visibility = "hidden";
+    b.onclick = () => { const z = t.indexOf(0); const near = Math.abs(z - i) === 3 || (Math.abs(z - i) === 1 && Math.floor(z / 3) === Math.floor(i / 3));
+      if (!near) return; [t[z], t[i]] = [t[i], t[z]]; draw(); if (t.join() === "1,2,3,4,5,6,7,8,0") setTimeout(() => close(true), 300); };
+    return b; })); };
+  draw(); done();
+});
+
+// L4: moving the stones. Tower of Hanoi with three stones: move the pile to the far bank.
+E.puzzleHanoi = () => E.panel((p, close) => {
+  const { s, done } = sheet(p, close, "Moving the stones", "Move the whole pile to the right spot. One stone at a time, never a bigger stone on a smaller one. Tap a pile to lift, tap another to drop.");
+  const pegs = [[3, 2, 1], [], []]; let held = null;
+  const g = grid(3, 520); s.appendChild(g);
+  const msg = document.createElement("p"); s.appendChild(msg);
+  const draw = () => { g.replaceChildren(...pegs.map((pg, i) => { const b = cell(""); b.style.flexDirection = "column-reverse"; b.style.justifyContent = "flex-start"; b.style.aspectRatio = "3/4";
+    pg.forEach(sz => { const d = document.createElement("div"); d.style.cssText = `height:18%;width:${30 + sz * 22}%;background:#8d8577;border-radius:6px;margin:2px auto`; b.appendChild(d); });
+    if (held === i) b.classList.add("ok");
+    b.setAttribute("aria-label", ["Left", "Middle", "Right"][i] + " pile, " + pg.length + " stones");
+    b.onclick = () => {
+      if (held === null) { if (pg.length) held = i; }
+      else { const top = pegs[held][pegs[held].length - 1];
+        if (!pg.length || pg[pg.length - 1] > top) { pg.push(pegs[held].pop()); } else msg.textContent = "A bigger stone can't go on a smaller one.";
+        held = null; }
+      draw(); if (pegs[2].length === 3) setTimeout(() => close(true), 300);
+    }; return b; })); };
+  draw(); s.appendChild(msg); done();
+});
+
+// L5: the root paths. Rotate the root tiles so light runs from the left edge to the right edge.
+E.puzzleRoots = () => E.panel((p, close) => {
+  const { s, done } = sheet(p, close, "The root paths", "Tap the root pieces to turn them. Make one unbroken path from the light (top left) to the way out (bottom right).");
+  // 2 rows x 4. Light enters top-left from the left, leaves bottom-right to the right.
+  const SHAPES = { s: ["━", "┃"], c: ["┗", "┏", "┓", "┛"] };
+  const tiles = [["s", 1, 0], ["c", 0, 2], null, null,
+                 null, ["c", 2, 0], ["s", 1, 0], ["s", 1, 0]];   // [type, current turn, solved turn]
+  const g = grid(4, 480); s.appendChild(g);
+  const draw = () => { g.replaceChildren(...tiles.map((t, i) => {
+    const b = cell(t ? SHAPES[t[0]][t[1]] : ""); b.style.color = "#e7c66a";
+    if (i === 0) b.style.borderLeft = "6px solid #ffe58a";
+    if (i === 7) b.style.borderRight = "6px solid #ffe58a";
+    if (!t) { b.disabled = true; b.style.opacity = ".35"; return b; }
+    b.setAttribute("aria-label", "root piece " + (i + 1));
+    b.onclick = () => { t[1] = (t[1] + 1) % SHAPES[t[0]].length; draw();
+      if (tiles.every(x => !x || x[1] === x[2])) setTimeout(() => close(true), 400); };
+    return b; })); };
+  draw(); done();
+});
+
 // ---------- levels ----------
 E.levels = [
   { title: "Level 1 · The herd leaves", sub: "Dawn", clip: "intro", start: "valley_road", entry: "start" },
@@ -82,6 +182,7 @@ R.stone_gap = {
 };
 async function trails() {
   if (!flag("seen_prints")) { note("Look at the hoofprints on the road first."); return; }
+  if (!flag("herd_order")) { if (await E.puzzleHerd() !== true) return; flag("herd_order", true); }
   const ok = await choicePanel("Which trail did the herd take?", "Pick the trail with the same prints as the road.",
     [{ svg: hoof("horse", "#5a4a3a"), label: "Left trail" }, { svg: hoof("cloven", "#3a2a1c"), label: "Right trail" }], 1);
   if (ok === true) { flag("trail_found", true); note("This way: through the gap."); }
@@ -121,7 +222,11 @@ R.church_steps = {
       talk: async () => { await say("Villager", CLUES.farms.text); E.addNote("farms"); } },   // M220
     { id: "woman", name: "Villager", sprite: 3, x: 590, y: 900, scale: 1.0, flip: true }
   ],
-  exits: [{ name: "Up the lane", rect: [1000, 500, 300, 150], walk: [1120, 600], to: "village_lane", entry: "from_church" }]
+  exits: [{ name: "Up the lane", rect: [1000, 500, 300, 150], walk: [1120, 600],
+    run: async () => {
+      if (!flag("latch_open")) { if (await E.puzzleLatch() !== true) return; flag("latch_open", true); }
+      await E.goto("village_lane", "from_church");
+    } }]
 };
 R.village_lane = {
   id: "village_lane",
@@ -229,7 +334,10 @@ R.kitchen = {
     } }],
   hotspots: [
     { id: "flashlight", name: "flashlight", rect: [180, 520, 200, 130], walk: [520, 900], when: () => !flag("got_light"),
-      use: async () => { flag("got_light", true); give("flashlight"); } }
+      use: async () => {
+        if (!flag("drawer_open")) { if (await E.puzzleSlide() !== true) return; flag("drawer_open", true); }
+        flag("got_light", true); give("flashlight");
+      } }
   ],
   exits: [
     { name: "Yard", rect: [1680, 300, 240, 700], walk: [1500, 1000], to: "yard", entry: "from_kitchen", when: () => !flag("talked_mom") },
@@ -279,6 +387,7 @@ R.rock_cleft = {
 };
 async function stones(item) {
   if (item !== "stick") { note("Test the stones with something before you step."); return; }
+  if (!flag("stones_moved")) { if (await E.puzzleHanoi() !== true) return; flag("stones_moved", true); }
   const ok = await E.panel((p, close) => {
     const s = document.createElement("div"); s.className = "sheet";
     s.innerHTML = "<h3>The stream</h3><p>Step only on stones that will hold. The cow's hoofprints show the way. Start at the bottom.</p>";
@@ -377,7 +486,11 @@ R.great_hall = {
   scale: [[760, 0.7], [1075, 1.2]],
   entries: { start: [960, 1020, 1] },
   hotspots: [],
-  exits: [{ name: "Towards the light", rect: [760, 440, 400, 300], walk: [960, 780], to: "root_chamber", entry: "start" },
+  exits: [{ name: "Towards the light", rect: [760, 440, 400, 300], walk: [960, 780],
+            run: async () => {
+              if (!flag("paths_lit")) { if (await E.puzzleRoots() !== true) return; flag("paths_lit", true); }
+              await E.goto("root_chamber", "start");
+            } },
           { name: "Back", rect: [700, 1020, 520, 60], walk: [960, 1060], to: "root_tunnel", entry: "back" }]
 };
 const ANIMALS = [[570, 820], [1260, 700], [1560, 665], [1720, 665]];   // feet of: horse, horse, deer, the cow
