@@ -12,6 +12,7 @@
   :root { color-scheme: dark; --bg: #0d0a0c; --panel: #1c1512; --line: #4a3a2c; --fg: #f6e7c8; --muted: #c4b08f;
     --accent: #e9a24c; --on-accent: #1d1206; --font: "Pixelify Sans", "Courier New", monospace; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }   /* .overlay sets display:flex, which would otherwise show hidden screens */
   html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 18px/1.5 var(--font); overflow: hidden; }
   #wrap { position: relative; width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; margin: 0 auto;
     top: 50%; transform: translateY(-50%); }

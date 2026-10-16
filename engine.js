@@ -89,6 +89,13 @@ E.level = async (n) => {
   await E.goto(L.start, L.entry);
 };
 
+// ---------- overlays: the click that opened one must not also press its buttons ----------
+function showOverlay(el) { el.dataset.shown = String(performance.now()); el.hidden = false; }
+document.addEventListener("click", ev => {
+  const o = ev.target.closest && ev.target.closest(".overlay");
+  if (o && performance.now() - Number(o.dataset.shown || 0) < 400) { ev.stopPropagation(); ev.preventDefault(); }
+}, true);
+
 // ---------- cutscenes ----------
 E.play = (name) => new Promise(res => {
   const box = document.getElementById("cut"), v = document.getElementById("cutv");
@@ -102,7 +109,7 @@ E.play = (name) => new Promise(res => {
   v.lastElementChild.onerror = end;   // every source failed: skip, as the main game does
   document.getElementById("skip").onclick = end;
   E.skipCut = end;
-  box.hidden = false;
+  showOverlay(box);
   v.load();
   v.play().catch(() => { v.muted = true; v.play().catch(end); });
 });
@@ -110,8 +117,9 @@ E.card = (title, sub) => new Promise(res => {
   const c = document.getElementById("card");
   c.querySelector("h2").textContent = title;
   c.querySelector("p").textContent = sub || "";
-  c.hidden = false;
-  const go = () => { c.hidden = true; c.onclick = null; res(); };
+  showOverlay(c);
+  let gone = false;
+  const go = () => { if (gone) return; gone = true; c.hidden = true; c.onclick = null; res(); };
   c.onclick = go;
   setTimeout(go, 3200);
 });
@@ -122,7 +130,7 @@ E.panel = (build) => new Promise(res => {
   p.replaceChildren();
   const close = (v) => { p.hidden = true; p.replaceChildren(); res(v); };
   build(p, close);
-  p.hidden = false;
+  showOverlay(p);
   const first = p.querySelector("button"); if (first) first.focus();
 });
 
