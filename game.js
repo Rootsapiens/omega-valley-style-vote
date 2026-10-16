@@ -523,3 +523,91 @@ R.root_chamber = {
 // Level 3's hay is used up at the barn; Level 5 needs hay again: the kitchen hay basket refills it.
 R.kitchen.hotspots.push({ id: "basket", name: "hay basket", rect: [1180, 860, 200, 140], walk: [1250, 1010], when: () => flag("cow_kept") && !has("hay"),
   use: async () => give("hay") });
+
+// ---------- password "sina": Joseph plays the whole game by himself ----------
+// Type sina anywhere (or in the menu's password box). Walking, talking, puzzles and cutscenes
+// all run on their own; lines move on after a pause. Esc stops it.
+(function () {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const P = () => document.getElementById("panel");
+  let stopped = false;
+  const live = () => { if (stopped) throw new Error("stopped"); };
+  async function openWait() { for (let i = 0; i < 60 && P().hidden; i++) await sleep(100); await sleep(700); }
+  async function tap(i, ms = 450) { live(); const b = P().querySelectorAll(".choice")[i]; if (b) b.click(); await sleep(ms); }
+  async function walkTo(x, y) { live(); await E.walkTo(x, y); }
+  const at = (room, kind, id) => (E.rooms[room][kind] || []).find(h => h.id === id || h.name === id);
+  async function use(room, id, item) { const h = at(room, "hotspots", id); E.sel = item || null; await walkTo(...(h.walk || [h.rect[0] + h.rect[2] / 2, h.rect[1] + h.rect[3]])); await sleep(300); const p = h.use(item || null); return p; }
+  async function talk(id) { const n = E.npc(id); await walkTo(n.x + (E.joseph.x < n.x ? -110 : 110), n.y); E.joseph.side = n.x >= E.joseph.x ? 1 : -1; await n.talk(); }
+  async function exit(room, name) { const e = at(room, "exits", name); await walkTo(...e.walk); return e.run ? e.run() : E.goto(e.to, e.entry); }
+  async function run() {
+    E.auto = true; stopped = false;
+    document.getElementById("menu").hidden = true;
+    E.st = { level: 0, room: null, flags: {}, inv: [], notes: [] };
+    E.note("Password accepted: Joseph plays by himself. Esc stops.", 3500);
+    const pump = setInterval(() => {   // lines move on by themselves, cards close by themselves
+      if (!document.getElementById("sub").hidden && performance.now() - (E.lineAt || 0) > 2600) { E.lineAt = performance.now(); document.getElementById("game").dispatchEvent(new PointerEvent("pointerdown", { button: 0 })); }
+      if (document.getElementById("sub").hidden) E.lineAt = performance.now();
+    }, 200);
+    E.busy = true;
+    try {
+      await E.level(0);
+      // Level 1
+      let p = use("valley_road", "prints"); await openWait(); P().querySelector("[data-x]").click(); await p;
+      await exit("valley_road", "Into the valley");
+      await use("stone_gap", "stick");
+      p = use("stone_gap", "trail_r");
+      await openWait(); for (let i = 0; i < 100 && !/Your turn/.test(P().textContent); i++) await sleep(100);
+      for (const i of [0, 2, 1, 3, 2, 0]) await tap(i, 500);
+      await openWait(); await tap(1); await p;
+      await exit("stone_gap", "Follow the trail");
+      await talk("friend");
+      await use("cliff_road", "bike");
+      // Level 2
+      await talk("oldman");
+      p = exit("church_steps", "Up the lane"); await openWait(); for (const i of [0, 2, 6, 8]) await tap(i, 600); await p;
+      await talk("woman2"); await talk("farmer");
+      p = E.openNotebook(); for (const i of [0, 1, 2]) { await openWait(); await tap(i, 700); } await p;
+      await exit("village_lane", "Go home");
+      // Level 3
+      await use("yard", "hay");
+      E.sel = "hay"; await walkTo(E.npc("cow").x + 120, E.npc("cow").y); await E.npc("cow").use("hay");
+      await use("yard", "barn");
+      await exit("yard", "Kitchen door");
+      await talk("mom");
+      p = use("kitchen", "flashlight"); await openWait(); await tap(7, 700); await tap(8, 700); await p;
+      await use("kitchen", "basket");
+      await exit("kitchen", "Outside (night)");
+      await use("fence_night", "valley", "flashlight");
+      // Level 4
+      p = use("rock_cleft", "stream", "stick"); await openWait();
+      for (const [a, b] of [[0, 2], [0, 1], [2, 1], [0, 2], [1, 0], [1, 2], [0, 2]]) { await tap(a, 350); await tap(b, 500); }
+      for (const [r, c] of [[0, 1], [1, 0], [2, 1], [3, 2]]) { if (r === 0) await openWait(); await tap((3 - r) * 3 + c, 600); }
+      await p;
+      const cow = E.npc("cow2"); await walkTo(cow.x + 90, cow.y + 40); await cow.talk();
+      await use("cave_mouth", "tunnel", "flashlight");
+      // Level 5
+      await sleep(4500);
+      E.sel = "flashlight"; for (const i of [0, 2, 1, 2]) { await at("root_tunnel", "hotspots", "roots" + i).use("flashlight"); await sleep(700); }
+      await exit("root_tunnel", "Deeper in");
+      p = exit("great_hall", "Towards the light"); await openWait(); for (const i of [0, 1, 1, 5, 5, 6, 7]) await tap(i, 450); await p;
+      await use("root_chamber", "animal3", "hay");
+    } catch (e) { if (!stopped) console.error(e); }
+    finally { clearInterval(pump); E.auto = false; E.busy = false; E.sel = null; }
+  }
+  E.autoplay = run;
+  let typed = "";
+  addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && E.auto) { stopped = true; E.note("Stopped. You play now.", 2500); return; }
+    if (ev.target && ev.target.id === "pw") return;
+    if (ev.key.length === 1) { typed = (typed + ev.key.toLowerCase()).slice(-4); if (typed === "sina" && !E.auto) { typed = ""; run(); } }
+  });
+  const pw = document.getElementById("pw");
+  if (pw) pw.addEventListener("keydown", ev => {
+    if (ev.key !== "Enter") return;
+    if (pw.value.trim().toLowerCase() === "sina") { pw.value = ""; run(); } else { pw.value = ""; pw.placeholder = "Wrong password"; }
+  });
+})();
+document.getElementById("pwgo") && (document.getElementById("pwgo").onclick = () => {
+  const pw = document.getElementById("pw");
+  if (pw.value.trim().toLowerCase() === "sina") { pw.value = ""; E.autoplay(); } else { pw.value = ""; pw.placeholder = "Wrong password"; }
+});
