@@ -1,10 +1,11 @@
-# Omega Valley: style samples
+# Omega Valley: Joseph
 
-Omega Valley is a point-and-click adventure about Joseph and a village on Omega Island. This page compares two possible art styles for the game on the same village street:
+A small pixel-art point-and-click game from the world of ROOTSAPIENS: Omega Valley. You play only Joseph. The animals of the valley are walking into the mountain on their own, and he follows them through five levels: the herd leaves, the village talks, home, past the stream, and inside the mountain.
 
-1. **32-bit pixel art.** The room and Joseph redrawn as pixel art on a 640 × 360 grid.
-2. **Painted rooms + 3D characters.** The game's current painted room with a simple 3D stand-in for Joseph, walking in 8 directions.
+Every room is a frame from the Omega Valley movie redrawn as 32-bit pixel art (640 × 360, shown three times larger). Short clips from the movie play between levels, and the spoken lines are the movie's own.
 
-Open the page, click the street to walk Joseph there, and press 1 or 2 to switch styles.
+**Play:** https://rootsapiens.github.io/omega-valley-style-vote/
 
-Everything is in one file, `index.html`, with the pictures embedded.
+How to play: click to walk, click people and things to talk or use them. Click an item in the bar, then click where to use it. Hold Tab to see everything you can use. Esc skips a cutscene.
+
+The earlier art-style comparison page is at `/styles/`.
